@@ -15,23 +15,21 @@
 
 // Can replace these defines with custom macros elsewhere
 #ifndef BSEECS_ASSERTS
-#define BSEECS_ASSERT(condition, msg) \
+	#define BSEECS_ASSERT(condition, msg) \
 		if (!(condition)) { \
 			std::cerr << "[BSEECS error]: " << msg << std::endl; \
 			::abort(); \
 		}
 #endif
-#define BSEECS_INFO_ENABLED
 #ifndef BSEECS_INFO
-#ifdef BSEECS_INFO_ENABLED
-#define BSEECS_INFO(msg) std::cout << "[BSEECS info]: " << msg << "\n";
-#else
-#define BSEECS_INFO(msg);
-#endif
+	#ifdef BSEECS_INFO_ENABLED
+		#define BSEECS_INFO(msg) std::cout << "[BSEECS info]: " << msg << "\n";
+	#else
+		#define BSEECS_INFO(msg);
+	#endif
 #endif
 
-namespace bseecs
-{
+namespace bseecs {
 
 	// In ECS, entities are simply just indices which group data
 	using EntityID = uint64_t;
@@ -49,8 +47,7 @@ namespace bseecs
 	constexpr size_t MAX_COMPONENTS = 64;
 
 	// Base class allows runtime polymorphism
-	class ISparseSet
-	{
+	class ISparseSet {
 	public:
 		virtual ~ISparseSet() = default;
 		virtual void Delete(EntityID) = 0;
@@ -59,14 +56,13 @@ namespace bseecs
 
 	/*
 	*  A templated sparse set implementation, mapping EntityID -> T
-	*
+	* 
 	*  - Get(EntityID): returns T or NULL if EntityID is not in sparse set
 	*  - Set(EntityID, T&&): Adds/Overwrites into the dense list for the specified entity
 	*  - Delete(EntityID): Removes data for EntityID from dense list
 	*/
 	template <typename T>
-	class SparseSet : public ISparseSet
-	{
+	class SparseSet: public ISparseSet {
 	private:
 
 		using Sparse = std::vector<size_t>;
@@ -87,8 +83,7 @@ namespace bseecs
 		* This doesnt actually insert anything into the dense
 		* vector, it simply defines a mapping from ID -> index
 		*/
-		void SetDenseIndex(EntityID id, size_t index)
-		{
+		void SetDenseIndex(EntityID id, size_t index) {
 			size_t page = id / SPARSE_MAX_SIZE;
 			size_t sparseIndex = id % SPARSE_MAX_SIZE; // Index local to a page
 
@@ -106,13 +101,11 @@ namespace bseecs
 		* Returns the dense index for a given entity ID,
 		* or a tombstone (null) value if non-existent
 		*/
-		size_t GetDenseIndex(EntityID id)
-		{
+		size_t GetDenseIndex(EntityID id) {
 			size_t page = id / SPARSE_MAX_SIZE;
 			size_t sparseIndex = id % SPARSE_MAX_SIZE;
 
-			if (page < m_sparsePages.size())
-			{
+			if (page < m_sparsePages.size()) {
 				Sparse& sparse = m_sparsePages[page];
 				if (sparseIndex < sparse.size())
 					return sparse[sparseIndex];
@@ -123,19 +116,16 @@ namespace bseecs
 
 	public:
 
-		SparseSet()
-		{
+		SparseSet() {
 			// Avoids initial copies/allocation, feel free to alter size
 			m_dense.reserve(100);
 		}
 
-		T* Set(EntityID id, T obj)
-		{
+		T* Set(EntityID id, T obj) {
 			// If index already exists, then simply overwrite
 			// that element in dense list, no need to delete
 			size_t index = GetDenseIndex(id);
-			if (index != tombstone)
-			{
+			if (index != tombstone) {
 				m_dense[index] = obj;
 				m_denseToEntity[index] = id;
 
@@ -151,8 +141,7 @@ namespace bseecs
 			return &m_dense.back();
 		}
 
-		T* Get(EntityID id)
-		{
+		T* Get(EntityID id) {
 			size_t index = GetDenseIndex(id);
 			return (index != tombstone) ? &m_dense[index] : nullptr;
 		}
@@ -169,9 +158,8 @@ namespace bseecs
 		{
 			return m_denseToEntity[compId];
 		}
-
-		void Delete(EntityID id) override
-		{
+		
+		void Delete(EntityID id) override {
 
 			size_t deletedIndex = GetDenseIndex(id);
 			BSEECS_ASSERT(deletedIndex != tombstone && !m_dense.empty(), "Trying to delete non-existent entity in sparse set");
@@ -186,33 +174,26 @@ namespace bseecs
 			m_denseToEntity.pop_back();
 		}
 
-		void Clear() override
-		{
+		void Clear() override {
 			m_dense.clear();
 			m_sparsePages.clear();
 			m_denseToEntity.clear();
 		}
 
-		bool IsEmpty() const
-		{
+		bool IsEmpty() const {
 			return m_dense.empty();
 		}
 
-		// Read-only dense list
-		//const std::vector<T>& Data() const {
-		//	return m_dense;
-		//}
+		// Dense list
 		std::vector<T>& Data()
 		{
 			return m_dense;
 		}
 
-		void PrintDense()
-		{
+		void PrintDense() {
 			std::stringstream ss;
 			std::string delim = "";
-			for (const T& e : m_dense)
-			{
+			for (const T& e : m_dense) {
 				ss << delim << e;
 				if (delim.empty())
 					delim = ", ";
@@ -223,8 +204,7 @@ namespace bseecs
 	};
 
 
-	class ECS
-	{
+	class ECS {
 	private:
 
 		// Each bit in the mask represents a component,
@@ -252,7 +232,7 @@ namespace bseecs
 		struct ComponentInfo
 		{
 			size_t m_bitPosition{};
-			ComponentMask m_requiredComponenets{};
+			ComponentMask m_requiredComponents{};
 			ComponentMask m_isRequiredInComponents{};
 		};
 
@@ -267,19 +247,18 @@ namespace bseecs
 		static constexpr size_t tombstone = std::numeric_limits<size_t>::max();
 
 
-#define ENTITY_INFO(id) \
+		#define ENTITY_INFO(id) \
 			"['" << GetEntityName(id) << "', ID: " << id << "]"
 
-#define BSEECS_ASSERT_VALID_ENTITY(id) \
+		#define BSEECS_ASSERT_VALID_ENTITY(id) \
 			BSEECS_ASSERT(id != NULL_ENTITY, "NULL_ENTITY cannot be operated on by the ECS") \
 			BSEECS_ASSERT(id < m_maxEntityID && id >= 0, "Invalid entity ID out of bounds: " << id);
 
-
+	
 	private:
 
 		template <typename T>
-		size_t GetComponentBitPosition()
-		{
+		size_t GetComponentBitPosition() {
 			TypeName name = typeid(T).name();
 			auto it = m_componentBitPosition.find(name);
 			if (it == m_componentBitPosition.end())
@@ -296,7 +275,7 @@ namespace bseecs
 			if (it == m_componentBitPosition.end())
 				return nullptr;
 
-			return &it->second.m_requiredComponenets;
+			return &it->second.m_requiredComponents;
 		}
 
 		template <typename T>
@@ -312,8 +291,7 @@ namespace bseecs
 
 
 		template <typename Component>
-		void SetComponentBit(ComponentMask& mask, bool val)
-		{
+		void SetComponentBit(ComponentMask& mask, bool val) {
 			size_t bitPos = GetComponentBitPosition<Component>();
 			BSEECS_ASSERT(bitPos != tombstone,
 				"Attempting to operate on unregistered component '" << typeid(Component).name() << "'");
@@ -322,8 +300,7 @@ namespace bseecs
 		}
 
 		template <typename Component>
-		ComponentMask::reference GetComponentBit(ComponentMask& mask)
-		{
+		ComponentMask::reference GetComponentBit(ComponentMask& mask) {
 			size_t bitPos = GetComponentBitPosition<Component>();
 			BSEECS_ASSERT(bitPos != tombstone,
 				"Attempting to operate on unregistered component '" << typeid(Component).name() << "'");
@@ -335,8 +312,7 @@ namespace bseecs
 		*  Assembles a generic mask for the given components
 		*/
 		template <typename... Components>
-		ComponentMask GetMask()
-		{
+		ComponentMask GetMask() {
 			ComponentMask mask;
 			(SetComponentBit<Components>(mask, 1), ...); // fold expression
 			return mask;
@@ -398,23 +374,20 @@ namespace bseecs
 
 		/*
 		*  Creates an entity and returns the ID to refer to that entity.
-		*
-		*  @param(name):
+		* 
+		*  @param(name): 
 		*  * Optional and used for debugging purposes, it
-		*    shouldn't be used often since there's no optimization
+		*    shouldn't be used often since there's no optimization 
 		*    in place yet for entities that share a name.
 		*/
-		EntityID CreateEntity(std::string_view name = "")
-		{
+		EntityID CreateEntity(std::string_view name="") {
 			EntityID id = tombstone;
 
-			if (m_availableEntities.size() == 0)
-			{
+			if (m_availableEntities.size() == 0) {
 				BSEECS_ASSERT(m_maxEntityID < MAX_ENTITIES, "Entity limit exceeded");
 				id = m_maxEntityID++;
 			}
-			else
-			{
+			else {
 				id = m_availableEntities.back();
 				m_availableEntities.pop_back();
 			}
@@ -428,8 +401,7 @@ namespace bseecs
 			return id;
 		}
 
-		std::string GetEntityName(EntityID id)
-		{
+		std::string GetEntityName(EntityID id) {
 			BSEECS_ASSERT_VALID_ENTITY(id);
 			//BSEECS_ASSERT_ALIVE_ENTITY(id);
 
@@ -443,17 +415,16 @@ namespace bseecs
 		/*
 		* Deletes an active entity and its associated components.
 		* - Overwrites the given entity to NULL_ENTITY.
-		*
+		* 
 		* This should NOT be used in the middle of a system while iterating
 		* through entities, as it will remove from the list immediately. Use
 		* FlagEntity(id, true) to mark an entity for deletion, and then DeleteFlagged()
 		* At the end of a frame to clear all flagged entities instead.
 		*/
-		void DeleteEntity(EntityID& id)
-		{
+		void DeleteEntity(EntityID& id) {
 			BSEECS_ASSERT_VALID_ENTITY(id);
 			//BSEECS_ASSERT_ALIVE_ENTITY(id);
-
+			
 			std::string name = GetEntityName(id);
 
 			m_entityNames.erase(id);
@@ -464,12 +435,11 @@ namespace bseecs
 		}
 
 		/*
-		*  Register a component with specific required components
+		*  Register a component with specific required components 
 		*	and create a pool for it
 		*/
 		template <typename T, typename ...Components>
-		void RegisterComponent()
-		{
+		void RegisterComponent() {
 			TypeName name = typeid(T).name();
 			BSEECS_ASSERT(m_componentBitPosition.find(name) == m_componentBitPosition.end(),
 				"Component with name '" << name << "' already registered");
@@ -496,12 +466,11 @@ namespace bseecs
 
 		/*
 		*  Attaches a component to an entity
-		*
+		* 
 		* - AddComponent<Transform>(player, {x, y, z});
 		*/
 		template <typename T, typename... RequiredComponents>
-		T& Add(EntityID id, T&& component = {})
-		{
+		T& Add(EntityID id, T&& component={}) {
 			BSEECS_ASSERT_VALID_ENTITY(id);
 			//BSEECS_ASSERT_ALIVE_ENTITY(id);
 
@@ -529,12 +498,11 @@ namespace bseecs
 
 		/*
 		*  Retrieves the specified component for the given entity
-		*
+		* 
 		* - ecs.GetComponent<Transform>(player);
 		*/
 		template <typename T>
-		T& Get(EntityID id)
-		{
+		T& Get(EntityID id) {
 			BSEECS_ASSERT_VALID_ENTITY(id);
 
 			SparseSet<T>& pool = GetComponentPool<T>();
@@ -547,12 +515,11 @@ namespace bseecs
 
 		/*
 		*  Removes a component from an entity
-		*
+		* 
 		* - ecs.RemoveComponent<Transform>(player);
 		*/
 		template <typename T, typename... SustainedComponents>
-		void Remove(EntityID id)
-		{
+		void Remove(EntityID id) {
 			BSEECS_ASSERT_VALID_ENTITY(id);
 
 			SparseSet<T>& pool = GetComponentPool<T>();
@@ -575,15 +542,13 @@ namespace bseecs
 		}
 
 		template <typename T>
-		bool Has(EntityID id)
-		{
+		bool Has(EntityID id) {
 			SparseSet<T>& pool = GetComponentPool<T>();
 			return pool.Get(id) ? true : false;
 		}
 
 		template <typename... Ts>
-		bool HasAll(EntityID id)
-		{
+		bool HasAll(EntityID id) {
 			// Fold operator, reads as 
 			// (HasComponent<Transform> && HasComponent<Physics> && HasComponent<Sprite> && ...)
 			return (Has<Ts>(id) && ...);
@@ -631,6 +596,81 @@ namespace bseecs
 			return (HasRemoved<Ts>(id) && ...);
 		}
 
+		template <typename TDense, typename T>
+		T& GetSibiling(EntityID DenseID)
+		{
+			EntityID EntId = GetComponentPool<TDense>().GetEntity(DenseID);
+			return GetComponentPool<T>().GetRef(EntId);
+		}
+
+		template <typename T>
+		T& GetSibiling(const SparseSet<T>& DensCompPool, EntityID DenseID)
+		{
+			EntityID EntId = DensCompPool.GetEntity(DenseID);
+			return GetComponentPool<T>().GetRef(EntId);
+		}
+
+		/*
+		*  Executes a passed lambda on all the entities that match the
+		*  passed parameter pack.
+		*
+		*  Provided function should follow one of two forms:
+		*  Provided function should follow one of two forms:
+		*  [](Component& c1, Component& c2);
+		*	The Main Component will be used to access the dense data
+		*	and extract the entity ID for the others.
+		*/
+		template <typename MainComponent, typename ...Components, typename Func>
+		void ForEach(Func&& func)
+		{
+			auto& compPool = GetComponentPool<MainComponent>();
+			auto& dense = compPool.Data();
+			//for (EntityID id : ids.Data())
+			for (size_t i = 0; i < dense.size(); i++)
+			{
+				EntityID id = compPool.GetEntity(i);
+				// This branch is for [](EntityID id, Component& c1, Component& c2);
+				// constexpr denotes this is evaluated at compile time, which allows
+				// the calling of func with different parameters.
+				if constexpr (std::is_invocable_v<Func, EntityID, MainComponent&, Components&...>)
+				{
+					func(id, dense[i], GetComponentPool<Components>().GetRef(id)...);
+				}
+
+				// This branch is for [](Component& c1, Component& c2);
+				else if constexpr (std::is_invocable_v<Func, MainComponent&, Components&...>)
+				{
+					func(dense[i], GetComponentPool<Components>().GetRef(id)...);
+				}
+
+				else
+				{
+					BSEECS_ASSERT(false,
+						"Bad lambda provided to .ForEach(), parameter pack does not match lambda args");
+				}
+			}
+		}
+	};
+
+	// Main comp should require all the other components
+	template<typename MainComponent, typename... Components>
+	class ISystem
+	{
+	public:
+		ISystem(ECS& ecs)
+			: m_Ecs(ecs), 
+			m_MainComps(ecs.GetComponentPool<MainComponent>()),
+			m_MainDense(ecs.GetComponentPool<MainComponent>().Data())
+		{
+			for (size_t i = 0; i < m_MainDense.size(); i++)
+			{
+				ecs.HasAllRequired<Components...>(i);
+			}
+		}
+	protected:
+		ECS& m_Ecs;
+		std::vector<MainComponent>& m_MainDense;
+		SparseSet<MainComponent>& m_MainComps;
 	};
 
 }
