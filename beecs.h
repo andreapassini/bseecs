@@ -448,14 +448,11 @@ namespace bseecs {
 
 			ComponentMask requiredCompMask = GetMask<Components...>();
 
-			m_componentBitPosition.emplace(
-				name
-				, ComponentInfo(
-					m_componentPools.size()
-					, requiredCompMask
-					, ComponentMask()
-				)
-			);
+			ComponentInfo& current = m_componentBitPosition[name];
+			current.m_bitPosition = m_componentPools.size();
+			current.m_isRequiredInComponents = requiredCompMask;
+			current.m_requiredComponents = ComponentMask();
+
 			m_componentPools.push_back(std::make_unique<SparseSet<T>>());
 
 			// Hello I require you, so beware when you be removed
